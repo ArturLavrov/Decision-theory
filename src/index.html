@@ -41,6 +41,10 @@
         .hidden {
             display: none;
         }
+        .best {
+            background-color: #c8f7c5 !important;
+            font-weight: bold;
+        }
     </style>
 </head>
 <body>
@@ -90,7 +94,50 @@
             <canvas id="resultsChart" class="mt-4" width="400" height="200"></canvas>
         </div>
         <div id="lab2" class="page hidden">
-            <h1 class="text-secondary">Lab 2: Coming Soon...</h1>
+            <h1 class="mb-4 text-primary">Decision Making Under Uncertainty</h1>
+            <div class="row mt-4">
+                <div class="col-md-4">
+                    <h3 class="text-dark">Alternatives</h3>
+                    <div id="alternatives-list-lab2"></div>
+                    <button class="btn btn-primary mt-2" onclick="addAlternativeLab2()">Add Alternative</button>
+                </div>
+                <div class="col-md-4">
+                    <h3 class="text-dark">States</h3>
+                    <div id="states-list-lab2"></div>
+                    <button class="btn btn-primary mt-2" onclick="addStateLab2()">Add State</button>
+                </div>
+                <div class="col-md-4">
+                    <h3 class="text-dark">Hurwicz Coefficient</h3>
+                    <input type="number" id="alpha" class="form-control" value="0.5" step="0.1" min="0" max="1">
+                </div>
+            </div>
+            <div class="mt-4">
+                <h3 class="text-dark">Utility Matrix</h3>
+                <table class="table table-bordered table-striped" id="utilityTable">
+                    <thead class="table-dark"></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <button class="btn btn-success mt-4" onclick="submitDataLab2()">Evaluate</button>
+            <div class="mt-4" id="results_lab2">
+
+            </div>
+            <div id="tableContentDiv" class="d-none">
+                <h2>Decision Table Visualization</h2>
+                <table class="table table-bordered table-striped" id="decisionTable">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Alternative</th>
+                            <th>Wald</th>
+                            <th>MaxMax</th>
+                            <th>Hurwicz</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Рядки будуть додані через JavaScript -->
+                    </tbody>
+                </table>
+            </div>
         </div>
         <div id="lab3" class="page hidden">
             <h1 class="text-secondary">Lab 3: Coming Soon...</h1>
@@ -98,6 +145,7 @@
     </div>
 
     <script>
+        ///LAB 1
         let alternatives = [];
         let experts = [];
         let myChart = null; // Ensure myChart is declared globally
@@ -222,7 +270,103 @@
                 }
             });
         }
+        ///LAB1 END
 
+        let alternatives_lab2 = [];
+        let states = [];
+
+        function addAlternativeLab2() {
+            const altName = prompt("Enter alternative name:");
+            if (altName) {
+                alternatives_lab2.push(altName);
+                renderUtilityTable();
+                renderAlternativesLab2()
+            }
+        }
+
+        function addStateLab2() {
+            const stateName = prompt("Enter state name:");
+            if (stateName) {
+                states.push(stateName);
+                renderUtilityTable();
+                renderStates_lab2();
+            }
+        }
+
+        function renderStates_lab2() {
+            document.getElementById("states-list-lab2").innerHTML = states.map(e => `<p>${e}</p>`).join('');
+        }
+
+
+        function renderAlternativesLab2() {
+            document.getElementById("alternatives-list-lab2").innerHTML = alternatives_lab2.map(a => `<p>${a}</p>`).join('');
+        }
+
+        function renderUtilityTable() {
+            const tableHead = document.querySelector("#utilityTable thead");
+            const tableBody = document.querySelector("#utilityTable tbody");
+
+            tableHead.innerHTML = `<tr><th>Alternatives</th>${states.map(s => `<th>${s}</th>`).join('')}</tr>`;
+            tableBody.innerHTML = alternatives_lab2.map((alt, i) =>
+                `<tr>
+                    <td>${alt}</td>
+                    ${states.map((_, j) => `<td><input type="number" class="form-control" id="score-${i}-${j}" min="0" max="10"></td>`).join('')}
+                </tr>`
+            ).join('');
+        }
+
+        function submitDataLab2() {
+            if (alternatives_lab2.length === 0 || states.length === 0) {
+                alert("Please add at least one alternative and one state before evaluating.");
+                return;
+            }
+
+            const matrix = alternatives_lab2.map((_, i) =>
+                states.map((_, j) => {
+                    const input = document.getElementById(`score-${i}-${j}`);
+                    return input ? Number(input.value) || 0 : 0;
+                })
+            );
+
+            const alpha = Number(document.getElementById("alpha").value);
+
+            fetch("http://localhost:5000/evaluate_lab2", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ matrix, alpha })
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log(data);
+                renderAlternativesResultTable(data);
+            })
+            .catch(error => console.error("Error:", error));
+        }
+
+        function renderAlternativesResultTable(data) {
+            var tableContentDiv = document.getElementById("tableContentDiv");
+            tableContentDiv.classList.remove('d-none');
+            const alternatives = Object.keys(data.wald.values);
+            const tbody = document.querySelector("#decisionTable tbody");
+            alternatives.forEach(alt => {
+                const row = document.createElement("tr");
+                const altCell = document.createElement("td");
+                altCell.innerText = alt;
+                row.appendChild(altCell);
+                function createCell(value, isBest) {
+                    const cell = document.createElement("td");
+                    cell.innerText = value;
+                    if (isBest) {
+                        cell.classList.add("best");
+                    }
+                    return cell;
+                }
+                row.appendChild(createCell(data.wald.values[alt], alt === data.wald.best_alternative));
+                row.appendChild(createCell(data.maxmax.values[alt], alt === data.maxmax.best_alternative));
+                row.appendChild(createCell(data.hurwicz.values[alt], alt === data.hurwicz.best_alternative));
+                tbody.appendChild(row);
+            });
+        }
     </script>
 </body>
 </html>
